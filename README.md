@@ -1,1 +1,1 @@
-- 👋 Hi, I’m @nrolan01 and I'm a 5 9" mamillian biped
+- 👋 Hi, I’m @nrolan01 and I'm not really a small dog
