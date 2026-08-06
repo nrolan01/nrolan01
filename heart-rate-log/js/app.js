@@ -1,0 +1,473 @@
+const view = document.getElementById('view');
+const pageTitle = document.getElementById('pageTitle');
+const toastEl = document.getElementById('toast');
+
+const state = {
+  tab: 'entry',
+  editingId: null,   // Airtable record id when editing an existing entry
+  cache: [],         // last-fetched records, used by history view + edit lookups
+};
+
+// ---------- utils ----------
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+function toLocalInputValue(date) {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function isoToLocalInputValue(iso) {
+  return toLocalInputValue(new Date(iso));
+}
+
+function localInputValueToIso(value) {
+  return new Date(value).toISOString();
+}
+
+function friendlyDateTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString(undefined, {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: 'numeric', minute: '2-digit',
+  });
+}
+
+function showToast(message, isError = false) {
+  toastEl.textContent = message;
+  toastEl.hidden = false;
+  toastEl.className = 'toast' + (isError ? ' error' : '');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => { toastEl.hidden = true; }, 3200);
+}
+
+function el(html) {
+  const t = document.createElement('template');
+  t.innerHTML = html.trim();
+  return t.content.firstElementChild;
+}
+
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+// ---------- router / shell ----------
+
+function setTab(tab, { resetEditing = true } = {}) {
+  state.tab = tab;
+  if (resetEditing) state.editingId = null;
+  document.querySelectorAll('.tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
+  render();
+}
+
+document.querySelectorAll('.tab-btn').forEach((btn) => {
+  btn.addEventListener('click', () => setTab(btn.dataset.tab));
+});
+
+function render() {
+  if (!isConfigured() && state.tab !== 'settings') {
+    setTab('settings');
+    return;
+  }
+  if (state.tab === 'entry') {
+    pageTitle.textContent = state.editingId ? 'Edit Entry' : 'New Entry';
+    view.replaceChildren(renderEntryView());
+  } else if (state.tab === 'history') {
+    pageTitle.textContent = 'History';
+    view.replaceChildren(renderHistoryLoading());
+    loadHistory();
+  } else {
+    pageTitle.textContent = 'Settings';
+    view.replaceChildren(renderSettingsView());
+  }
+}
+
+// ---------- Entry (New / Edit) view ----------
+
+function renderEntryView() {
+  const editing = state.editingId ? state.cache.find((r) => r.id === state.editingId) : null;
+  const f = editing ? editing.fields : {};
+
+  const initialDateVal = f[FIELDS.OCCURRED_AT] ? isoToLocalInputValue(f[FIELDS.OCCURRED_AT]) : toLocalInputValue(new Date());
+
+  const wrap = el(`<div></div>`);
+
+  const card = el(`<div class="card"></div>`);
+
+  // date/time chips + input
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">When did it happen?</span>
+      <div class="chip-row">
+        <button type="button" class="chip" data-chip="now">Now</button>
+        <button type="button" class="chip" data-chip="today">Today</button>
+        <button type="button" class="chip" data-chip="yesterday">Yesterday</button>
+      </div>
+      <input type="datetime-local" id="occurredAt" value="${initialDateVal}" />
+    </label>
+  `));
+
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">Duration (minutes)</span>
+      <input type="number" id="duration" min="0" step="1" placeholder="e.g. 10" value="${f[FIELDS.DURATION] ?? ''}" />
+    </label>
+  `));
+
+  const intensityWrap = el(`
+    <div class="field">
+      <span class="label-text">Intensity</span>
+      <div class="segmented" id="intensityGroup"></div>
+    </div>
+  `);
+  const seg = intensityWrap.querySelector('#intensityGroup');
+  INTENSITY_OPTIONS.forEach((opt) => {
+    const b = el(`<button type="button" data-value="${opt.value}">${opt.value}</button>`);
+    b.title = opt.label;
+    if (String(f[FIELDS.INTENSITY]) === opt.value) b.classList.add('selected');
+    b.addEventListener('click', () => {
+      const wasSelected = b.classList.contains('selected');
+      seg.querySelectorAll('button').forEach((x) => x.classList.remove('selected'));
+      if (!wasSelected) b.classList.add('selected'); // click again to deselect (field is optional)
+    });
+    seg.appendChild(b);
+  });
+  card.appendChild(intensityWrap);
+
+  const symptomsWrap = el(`
+    <div class="field">
+      <span class="label-text">Symptoms</span>
+      <div class="check-grid" id="symptomGrid"></div>
+    </div>
+  `);
+  const grid = symptomsWrap.querySelector('#symptomGrid');
+  const selectedSymptoms = new Set(f[FIELDS.SYMPTOMS] || []);
+  SYMPTOM_OPTIONS.forEach((s) => {
+    const chip = el(`
+      <label class="check-chip ${selectedSymptoms.has(s) ? 'checked' : ''}">
+        <input type="checkbox" value="${s}" ${selectedSymptoms.has(s) ? 'checked' : ''} />
+        <span>${s}</span>
+      </label>
+    `);
+    chip.querySelector('input').addEventListener('change', (e) => {
+      chip.classList.toggle('checked', e.target.checked);
+    });
+    grid.appendChild(chip);
+  });
+  card.appendChild(symptomsWrap);
+
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">Activity / context</span>
+      <input type="text" id="activity" list="activitySuggestions" placeholder="e.g. resting, standing up, exercising" value="${escapeHtml(f[FIELDS.ACTIVITY])}" />
+      <datalist id="activitySuggestions">
+        <option value="Resting">
+        <option value="Standing up">
+        <option value="Exercising">
+        <option value="Sleeping">
+        <option value="Stressed">
+      </datalist>
+    </label>
+  `));
+
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">Heart rate (bpm) — if known</span>
+      <input type="number" id="heartRate" min="0" step="1" placeholder="e.g. 145" value="${f[FIELDS.HEART_RATE] ?? ''}" />
+    </label>
+  `));
+
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">Notes</span>
+      <textarea id="notes" placeholder="Anything else worth noting">${escapeHtml(f[FIELDS.NOTES])}</textarea>
+    </label>
+  `));
+
+  wrap.appendChild(card);
+
+  const errBox = el(`<div class="error-box" hidden></div>`);
+  wrap.appendChild(errBox);
+
+  const saveBtn = el(`<button type="button" class="primary">${editing ? 'Save Changes' : 'Log Entry'}</button>`);
+  wrap.appendChild(saveBtn);
+
+  if (editing) {
+    const cancelBtn = el(`<button type="button" class="secondary">Cancel</button>`);
+    cancelBtn.addEventListener('click', () => { state.editingId = null; render(); });
+    wrap.appendChild(cancelBtn);
+
+    const delBtn = el(`<button type="button" class="danger">Delete Entry</button>`);
+    delBtn.addEventListener('click', async () => {
+      if (!confirm('Delete this entry? This cannot be undone.')) return;
+      try {
+        await deleteRecord(editing.id);
+        showToast('Entry deleted');
+        state.editingId = null;
+        setTab('history');
+      } catch (e) {
+        showToast(e.message, true);
+      }
+    });
+    wrap.appendChild(delBtn);
+  }
+
+  // chip behavior
+  wrap.querySelectorAll('[data-chip]').forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const input = wrap.querySelector('#occurredAt');
+      const current = input.value ? new Date(input.value) : new Date();
+      const now = new Date();
+      if (chip.dataset.chip === 'now') {
+        input.value = toLocalInputValue(now);
+      } else if (chip.dataset.chip === 'today') {
+        current.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
+        input.value = toLocalInputValue(current);
+      } else if (chip.dataset.chip === 'yesterday') {
+        const y = new Date(now);
+        y.setDate(now.getDate() - 1);
+        current.setFullYear(y.getFullYear(), y.getMonth(), y.getDate());
+        input.value = toLocalInputValue(current);
+      }
+    });
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    errBox.hidden = true;
+    const occurredAtVal = wrap.querySelector('#occurredAt').value;
+    if (!occurredAtVal) {
+      errBox.textContent = 'Please set a date/time.';
+      errBox.hidden = false;
+      return;
+    }
+
+    const durationVal = wrap.querySelector('#duration').value;
+    const hrVal = wrap.querySelector('#heartRate').value;
+    const intensityBtn = seg.querySelector('button.selected');
+    const symptoms = Array.from(grid.querySelectorAll('input:checked')).map((i) => i.value);
+
+    const fields = {
+      [FIELDS.OCCURRED_AT]: localInputValueToIso(occurredAtVal),
+      [FIELDS.DURATION]: durationVal === '' ? null : Number(durationVal),
+      [FIELDS.INTENSITY]: intensityBtn ? intensityBtn.dataset.value : null,
+      [FIELDS.SYMPTOMS]: symptoms,
+      [FIELDS.ACTIVITY]: wrap.querySelector('#activity').value || null,
+      [FIELDS.HEART_RATE]: hrVal === '' ? null : Number(hrVal),
+      [FIELDS.NOTES]: wrap.querySelector('#notes').value || null,
+    };
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    try {
+      if (editing) {
+        await updateRecord(editing.id, fields);
+        showToast('Entry updated');
+      } else {
+        await createRecord(fields);
+        showToast('Entry logged');
+      }
+      state.editingId = null;
+      setTab('history');
+    } catch (e) {
+      errBox.textContent = e.message;
+      errBox.hidden = false;
+      saveBtn.disabled = false;
+      saveBtn.textContent = editing ? 'Save Changes' : 'Log Entry';
+    }
+  });
+
+  return wrap;
+}
+
+// ---------- History view ----------
+
+function renderHistoryLoading() {
+  return el(`<div class="spinner-line">Loading…</div>`);
+}
+
+async function loadHistory() {
+  try {
+    const records = await listAllRecords({ sortField: FIELDS.OCCURRED_AT, sortDirection: 'desc' });
+    state.cache = records;
+    if (state.tab === 'history') {
+      view.replaceChildren(renderHistoryView(records));
+    }
+  } catch (e) {
+    view.replaceChildren(el(`<div class="error-box">${e.message}</div>`));
+  }
+}
+
+function renderHistoryView(records) {
+  const wrap = el(`<div></div>`);
+
+  const filterRow = el(`
+    <div class="filter-row">
+      <select id="symptomFilter">
+        <option value="">All symptoms</option>
+        ${SYMPTOM_OPTIONS.map((s) => `<option value="${s}">${s}</option>`).join('')}
+      </select>
+      <input type="date" id="fromDate" />
+      <input type="date" id="toDate" />
+    </div>
+  `);
+  wrap.appendChild(filterRow);
+
+  const gridWrap = el(`<div class="grid-wrap"></div>`);
+  wrap.appendChild(gridWrap);
+
+  function applyFilters() {
+    const symptom = filterRow.querySelector('#symptomFilter').value;
+    const from = filterRow.querySelector('#fromDate').value;
+    const to = filterRow.querySelector('#toDate').value;
+
+    let filtered = records;
+    if (symptom) {
+      filtered = filtered.filter((r) => (r.fields[FIELDS.SYMPTOMS] || []).includes(symptom));
+    }
+    if (from) {
+      const fromDate = new Date(from + 'T00:00:00');
+      filtered = filtered.filter((r) => r.fields[FIELDS.OCCURRED_AT] && new Date(r.fields[FIELDS.OCCURRED_AT]) >= fromDate);
+    }
+    if (to) {
+      const toDate = new Date(to + 'T23:59:59');
+      filtered = filtered.filter((r) => r.fields[FIELDS.OCCURRED_AT] && new Date(r.fields[FIELDS.OCCURRED_AT]) <= toDate);
+    }
+    gridWrap.replaceChildren(buildGrid(filtered));
+  }
+
+  filterRow.querySelectorAll('select, input').forEach((elm) => elm.addEventListener('change', applyFilters));
+
+  applyFilters();
+  return wrap;
+}
+
+function buildGrid(records) {
+  if (records.length === 0) {
+    return el(`<div class="empty-state">No entries yet. Log one from the "Log" tab.</div>`);
+  }
+
+  const table = el(`
+    <table class="grid">
+      <thead>
+        <tr>
+          <th>When</th>
+          <th>Duration</th>
+          <th>Intensity</th>
+          <th>Symptoms</th>
+          <th>HR</th>
+          <th>Activity</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  `);
+  const tbody = table.querySelector('tbody');
+
+  records.forEach((r) => {
+    const f = r.fields;
+    const symptoms = (f[FIELDS.SYMPTOMS] || []).map((s) => `<span class="pill">${escapeHtml(s)}</span>`).join(' ');
+    const row = el(`
+      <tr class="row">
+        <td>${f[FIELDS.OCCURRED_AT] ? friendlyDateTime(f[FIELDS.OCCURRED_AT]) : '—'}</td>
+        <td>${f[FIELDS.DURATION] ?? '—'}${f[FIELDS.DURATION] != null ? ' min' : ''}</td>
+        <td>${f[FIELDS.INTENSITY] ?? '—'}</td>
+        <td>${symptoms || '—'}</td>
+        <td>${f[FIELDS.HEART_RATE] ?? '—'}</td>
+        <td>${escapeHtml(f[FIELDS.ACTIVITY]) || '—'}</td>
+      </tr>
+    `);
+    row.addEventListener('click', () => {
+      state.editingId = r.id;
+      setTab('entry', { resetEditing: false });
+    });
+    tbody.appendChild(row);
+  });
+
+  return table;
+}
+
+// ---------- Settings view ----------
+
+function renderSettingsView() {
+  const cfg = getConfig();
+  const wrap = el(`<div></div>`);
+
+  wrap.appendChild(el(`
+    <div class="card">
+      <p class="hint">
+        Connect your Airtable base. Create a base called <strong>Heart Rate Log</strong> with a table
+        called <strong>Episodes</strong> and the fields described in the setup README, then generate a
+        Personal Access Token at
+        <span style="color:var(--text)">airtable.com/create/tokens</span> scoped to just that base
+        (<code>data.records:read</code> and <code>data.records:write</code>).
+      </p>
+    </div>
+  `));
+
+  const card = el(`<div class="card"></div>`);
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">Personal Access Token</span>
+      <input type="text" id="cfgToken" placeholder="patXXXXXXXX..." value="${escapeHtml(cfg.token)}" />
+    </label>
+  `));
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">Base ID</span>
+      <input type="text" id="cfgBase" placeholder="appXXXXXXXX..." value="${escapeHtml(cfg.baseId)}" />
+    </label>
+  `));
+  card.appendChild(el(`
+    <label class="field">
+      <span class="label-text">Table name</span>
+      <input type="text" id="cfgTable" placeholder="Episodes" value="${escapeHtml(cfg.tableName || 'Episodes')}" />
+    </label>
+  `));
+  wrap.appendChild(card);
+
+  const errBox = el(`<div class="error-box" hidden></div>`);
+  wrap.appendChild(errBox);
+
+  const saveBtn = el(`<button type="button" class="primary">Save &amp; Test Connection</button>`);
+  saveBtn.addEventListener('click', async () => {
+    errBox.hidden = true;
+    const token = card.querySelector('#cfgToken').value.trim();
+    const baseId = card.querySelector('#cfgBase').value.trim();
+    const tableName = card.querySelector('#cfgTable').value.trim() || 'Episodes';
+
+    if (!token || !baseId) {
+      errBox.textContent = 'Token and Base ID are both required.';
+      errBox.hidden = false;
+      return;
+    }
+
+    saveConfig({ token, baseId, tableName });
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Testing…';
+    try {
+      await testConnection();
+      showToast('Connected!');
+      setTab('entry');
+    } catch (e) {
+      errBox.textContent = e.message;
+      errBox.hidden = false;
+    } finally {
+      saveBtn.disabled = false;
+      saveBtn.textContent = 'Save & Test Connection';
+    }
+  });
+  wrap.appendChild(saveBtn);
+
+  return wrap;
+}
+
+// ---------- init ----------
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
+
+setTab(isConfigured() ? 'entry' : 'settings');
