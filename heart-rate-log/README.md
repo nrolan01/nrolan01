@@ -8,6 +8,34 @@ This is **Phase 1** of the plan: manual logging with a browsable/editable histor
 EKG PDF attachments (Phase 2), intensity/duration/frequency charts (Phase 3), and pulling
 real heart-rate readings from Fitbit (Phase 4) come next.
 
+## How this all fits together (ELI5)
+
+There are three separate pieces here, and it helps to know what each one actually does:
+
+- **The app (this code)** — just a folder of files: an HTML "form," some styling, and some
+  JavaScript logic. On its own, a folder of files isn't reachable from your phone — it needs
+  somewhere to live on the internet.
+
+- **Vercel** — a free hosting service. All it does is take this folder of files and give it a
+  real web address (`https://something.vercel.app`) so your phone's browser can fetch it, the
+  same way any website is fetched. **Vercel never sees or stores any of your health data.** It
+  only ever hands out the same unchanging form/logic files. Every time you open the app, your
+  phone downloads those files fresh (or from its own cache) and runs them locally.
+
+- **Airtable** — the actual filing cabinet. Every entry you log is a row that lives here, not
+  on Vercel and not on your phone. When you tap "Log Entry," the app running in your phone's
+  browser reaches out **directly** to Airtable's servers and writes the row itself — Vercel is
+  not involved in that step at all, it only served the code once when the page loaded.
+
+- **The Personal Access Token (PAT)** — think of this like a key or an employee badge. It's
+  what lets *this specific app* unlock and write into *your specific* Airtable filing cabinet.
+  Anyone with that token string can read/write your entries — that's why it's typed into
+  Settings once and kept only on your own device, never in the code itself.
+
+Rough analogy: Vercel is like the ordering screen at a restaurant kiosk. Airtable is the
+kitchen where the food (your data) actually lives. The token is the badge that lets this one
+kiosk swing open the kitchen door.
+
 ## 1. Create the Airtable base
 
 1. Go to [airtable.com](https://airtable.com) and create a new base named **Heart Rate Log**.
@@ -60,6 +88,40 @@ It'll launch full-screen like a native app.
 - Duration is just minutes — no unit picker.
 - `typecast` is enabled on writes, so the app can create new `Intensity`/`Symptoms` select
   options on the fly; you don't need to pre-populate them in Airtable.
+
+## Who has access to what
+
+Three different "logins" are involved, and each controls something different:
+
+| Account | Controls | Who needs one |
+|---|---|---|
+| **Vercel** | Can edit/redeploy the app's code, see deployment logs | Just you (whoever owns the GitHub repo) |
+| **The deployed URL** | Anyone who opens it can *see the app shell* | Technically anyone with the exact link — but it's useless without a valid token, so treat it as a private link rather than something requiring a password |
+| **The Personal Access Token + Base ID + Table name** | Whoever enters these into the app's Settings screen can read/write every entry | Whoever you give the token to |
+
+**No one needs a Vercel account or an Airtable account just to use the app day-to-day** —
+opening the URL, installing it to a home screen, and logging entries all work with zero login,
+because the token itself (not a username/password) is what authorizes the app to talk to
+Airtable.
+
+### Giving your wife access to the same log
+
+The simplest way — have her use the same app, pointed at the same data:
+
+1. Send her the deployed URL (text, AirDrop, whatever)
+2. She opens it in **Safari** on her phone → Share icon → **Add to Home Screen**, same as you did
+3. In Settings, she enters the **exact same** Personal Access Token, Base ID, and table name you're using
+
+That's it — her phone is now just a second window into the same Airtable base. Nothing to
+invite, nothing to approve, no Airtable account needed on her end at all. The one limitation:
+since both of you are using the same token, Airtable has no way of recording *which of you*
+logged a given entry — if that ever matters, we could add a simple "Logged by" field to the
+form later.
+
+If instead she wants to browse or edit the raw data directly in Airtable's own app/website
+(rather than through this app), that's a separate, second kind of access: you'd click
+**Share** on the Airtable base itself and invite her as a collaborator by email — that does
+require her to have (or create) a free Airtable account, and is unrelated to the token.
 
 ## Privacy
 
