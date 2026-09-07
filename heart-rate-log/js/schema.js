@@ -21,6 +21,7 @@ const SYMPTOM_OPTIONS = [
   'Fainting/Near-Fainting',
   'Sweating',
   'Fatigue',
+  'Diaphragm Quivering',
   'Other',
 ];
 

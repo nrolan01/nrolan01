@@ -96,6 +96,10 @@ function renderEntryView() {
   const card = el(`<div class="card"></div>`);
 
   // date/time chips + input
+  // The visible box is a plain styled <div> we fully control; the real
+  // datetime-local input sits invisibly on top of it to catch the tap and
+  // open iOS's native picker. iOS Safari doesn't reliably respect CSS width
+  // on datetime-local, which was causing the control to overflow its card.
   card.appendChild(el(`
     <label class="field">
       <span class="label-text">When did it happen?</span>
@@ -104,7 +108,10 @@ function renderEntryView() {
         <button type="button" class="chip" data-chip="today">Today</button>
         <button type="button" class="chip" data-chip="yesterday">Yesterday</button>
       </div>
-      <input type="datetime-local" id="occurredAt" value="${initialDateVal}" />
+      <div class="datetime-shell">
+        <div class="datetime-display" id="occurredAtDisplay"></div>
+        <input type="datetime-local" id="occurredAt" class="datetime-native" value="${initialDateVal}" />
+      </div>
     </label>
   `));
 
@@ -213,10 +220,23 @@ function renderEntryView() {
     wrap.appendChild(delBtn);
   }
 
+  // date/time display sync — the native input drives the value, this div is
+  // purely what's shown, so its width/layout is fully ours to control
+  const occurredAtInput = wrap.querySelector('#occurredAt');
+  const occurredAtDisplay = wrap.querySelector('#occurredAtDisplay');
+  function refreshDateDisplay() {
+    occurredAtDisplay.textContent = occurredAtInput.value
+      ? friendlyDateTime(localInputValueToIso(occurredAtInput.value))
+      : 'Select date & time';
+  }
+  occurredAtInput.addEventListener('input', refreshDateDisplay);
+  occurredAtInput.addEventListener('change', refreshDateDisplay);
+  refreshDateDisplay();
+
   // chip behavior
   wrap.querySelectorAll('[data-chip]').forEach((chip) => {
     chip.addEventListener('click', () => {
-      const input = wrap.querySelector('#occurredAt');
+      const input = occurredAtInput;
       const current = input.value ? new Date(input.value) : new Date();
       const now = new Date();
       if (chip.dataset.chip === 'now') {
@@ -230,6 +250,7 @@ function renderEntryView() {
         current.setFullYear(y.getFullYear(), y.getMonth(), y.getDate());
         input.value = toLocalInputValue(current);
       }
+      refreshDateDisplay();
     });
   });
 
