@@ -6,6 +6,7 @@ const SHELL = [
   './js/app.js',
   './js/airtable.js',
   './js/schema.js',
+  './js/themes.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',

@@ -480,10 +480,43 @@ function renderSettingsView() {
   });
   wrap.appendChild(saveBtn);
 
+  wrap.appendChild(renderAppearanceCard());
+
   return wrap;
 }
 
+function renderAppearanceCard() {
+  const card = el(`<div class="card"></div>`);
+  card.appendChild(el(`<span class="label-text">Appearance</span>`));
+
+  const activeId = getSavedThemeId();
+  THEMES.forEach((theme) => {
+    const row = el(`
+      <button type="button" class="theme-row ${theme.id === activeId ? 'active' : ''}">
+        <span class="theme-dot" style="background:${theme.accent}"></span>
+        <span class="theme-info">
+          <span class="theme-name">${escapeHtml(theme.name)}</span>
+          <span class="theme-note">${escapeHtml(theme.note)}</span>
+        </span>
+        <span class="theme-check">${theme.id === activeId ? '✓' : ''}</span>
+      </button>
+    `);
+    row.addEventListener('click', () => {
+      applyTheme(theme.id);
+      card.querySelectorAll('.theme-row').forEach((r) => r.classList.remove('active'));
+      card.querySelectorAll('.theme-check').forEach((c) => { c.textContent = ''; });
+      row.classList.add('active');
+      row.querySelector('.theme-check').textContent = '✓';
+    });
+    card.appendChild(row);
+  });
+
+  return card;
+}
+
 // ---------- init ----------
+
+applyTheme(getSavedThemeId());
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -184,7 +184,7 @@ input.datetime-native {
   font-size: 14px;
 }
 .check-chip input { accent-color: var(--accent); width: 16px; height: 16px; }
-.check-chip.checked { border-color: var(--accent); background: rgba(214,51,108,0.15); }
+.check-chip.checked { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
 
 button.primary {
   width: 100%;
@@ -295,3 +295,29 @@ table.grid tr.row { cursor: pointer; }
 .toast.error { border-color: var(--danger); color: #ffb4ae; }
 
 .spinner-line { color: var(--text-dim); text-align: center; padding: 20px; }
+
+/* Appearance / theme picker */
+.theme-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 8px;
+  text-align: left;
+}
+.theme-row.active { border-color: var(--accent); }
+.theme-dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.theme-info { flex: 1; min-width: 0; }
+.theme-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.theme-note { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+.theme-check { color: var(--accent); font-size: 18px; flex-shrink: 0; }
