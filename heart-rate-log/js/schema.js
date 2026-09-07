@@ -10,12 +10,16 @@ const FIELDS = {
   EKG: 'EKG PDF',                // Attachment (used starting Phase 2)
 };
 
+// Must match the "Symptoms" multiple-select choices in the Airtable Episodes table exactly.
 const SYMPTOM_OPTIONS = [
-  'Lightheadedness',
-  'Skipped beats / palpitations',
-  'Racing heart',
-  'Chest discomfort',
-  'Shortness of breath',
+  'Light Headed',
+  'Heart Racing',
+  'Skipped Beat',
+  'Tingling/Weak Arms',
+  'Short of Breath',
+  'Chest Pain/Pressure',
+  'Fainting/Near-Fainting',
+  'Sweating',
   'Fatigue',
   'Other',
 ];

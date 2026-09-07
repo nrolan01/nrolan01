@@ -18,7 +18,7 @@ real heart-rate readings from Fitbit (Phase 4) come next.
    | `Occurred At`        | Date — turn on **"Include a time field"** |
    | `Duration (min)`     | Number                                 |
    | `Intensity`          | Single select (leave options empty — the app auto-creates `1`–`5` the first time you use them) |
-   | `Symptoms`           | Multiple select (leave options empty — auto-created the same way) |
+   | `Symptoms`           | Multiple select — Light Headed, Heart Racing, Skipped Beat, Tingling/Weak Arms, Short of Breath, Chest Pain/Pressure, Fainting/Near-Fainting, Sweating, Fatigue, Other (or leave empty — auto-created the first time you use them) |
    | `Activity`           | Single line text                       |
    | `Heart Rate (bpm)`   | Number                                 |
    | `Notes`              | Long text                              |
