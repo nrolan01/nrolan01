@@ -84,6 +84,15 @@ label.field > span.label-text {
   margin-bottom: 6px;
 }
 
+.field-row {
+  display: flex;
+  gap: 12px;
+}
+.field-row > .field {
+  flex: 1;
+  min-width: 0;
+}
+
 input[type="text"], input[type="number"], input[type="datetime-local"],
 input[type="date"], textarea, select {
   width: 100%;
@@ -156,7 +165,7 @@ input.datetime-native {
   padding: 12px 4px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--surface-2);
+  background: color-mix(in srgb, var(--accent) var(--seg-mix, 0%), var(--surface-2));
   color: var(--text);
   font-size: 15px;
   font-weight: 600;

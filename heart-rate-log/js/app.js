@@ -129,9 +129,12 @@ function renderEntryView() {
     </div>
   `);
   const seg = intensityWrap.querySelector('#intensityGroup');
-  INTENSITY_OPTIONS.forEach((opt) => {
+  INTENSITY_OPTIONS.forEach((opt, idx) => {
     const b = el(`<button type="button" data-value="${opt.value}">${opt.value}</button>`);
     b.title = opt.label;
+    // Resting tint ramps light-to-saturated across the 5 buttons (1=15% accent, 5=95%),
+    // so the scale reads as increasing severity even before one is picked.
+    b.style.setProperty('--seg-mix', `${15 + idx * 20}%`);
     if (String(f[FIELDS.INTENSITY]) === opt.value) b.classList.add('selected');
     b.addEventListener('click', () => {
       const wasSelected = b.classList.contains('selected');
@@ -179,10 +182,16 @@ function renderEntryView() {
   `));
 
   card.appendChild(el(`
-    <label class="field">
-      <span class="label-text">Heart rate (bpm) — if known</span>
-      <input type="number" id="heartRate" min="0" step="1" placeholder="e.g. 145" value="${f[FIELDS.HEART_RATE] ?? ''}" />
-    </label>
+    <div class="field-row">
+      <label class="field">
+        <span class="label-text">Heart rate (bpm)</span>
+        <input type="number" id="heartRate" min="0" step="1" placeholder="e.g. 145" value="${f[FIELDS.HEART_RATE] ?? ''}" />
+      </label>
+      <label class="field">
+        <span class="label-text">SpO2 (%)</span>
+        <input type="number" id="spo2" min="0" max="100" step="1" placeholder="e.g. 97" value="${f[FIELDS.SPO2] ?? ''}" />
+      </label>
+    </div>
   `));
 
   card.appendChild(el(`
@@ -265,6 +274,7 @@ function renderEntryView() {
 
     const durationVal = wrap.querySelector('#duration').value;
     const hrVal = wrap.querySelector('#heartRate').value;
+    const spo2Val = wrap.querySelector('#spo2').value;
     const intensityBtn = seg.querySelector('button.selected');
     const symptoms = Array.from(grid.querySelectorAll('input:checked')).map((i) => i.value);
 
@@ -275,6 +285,7 @@ function renderEntryView() {
       [FIELDS.SYMPTOMS]: symptoms,
       [FIELDS.ACTIVITY]: wrap.querySelector('#activity').value || null,
       [FIELDS.HEART_RATE]: hrVal === '' ? null : Number(hrVal),
+      [FIELDS.SPO2]: spo2Val === '' ? null : Number(spo2Val),
       [FIELDS.NOTES]: wrap.querySelector('#notes').value || null,
     };
 
@@ -377,6 +388,7 @@ function buildGrid(records) {
           <th>Intensity</th>
           <th>Symptoms</th>
           <th>HR</th>
+          <th>SpO2</th>
           <th>Activity</th>
         </tr>
       </thead>
@@ -395,6 +407,7 @@ function buildGrid(records) {
         <td>${f[FIELDS.INTENSITY] ?? '—'}</td>
         <td>${symptoms || '—'}</td>
         <td>${f[FIELDS.HEART_RATE] ?? '—'}</td>
+        <td>${f[FIELDS.SPO2] != null ? f[FIELDS.SPO2] + '%' : '—'}</td>
         <td>${escapeHtml(f[FIELDS.ACTIVITY]) || '—'}</td>
       </tr>
     `);

@@ -49,6 +49,7 @@ kiosk swing open the kitchen door.
    | `Symptoms`           | Multiple select — Light Headed, Heart Racing, Skipped Beat, Tingling/Weak Arms, Short of Breath, Chest Pain/Pressure, Fainting/Near-Fainting, Sweating, Fatigue, Other (or leave empty — auto-created the first time you use them) |
    | `Activity`           | Single line text                       |
    | `Heart Rate (bpm)`   | Number                                 |
+   | `SpO2 (%)`           | Number (pulse oximeter reading)        |
    | `Notes`              | Long text                              |
    | `EKG PDF`            | Attachment (not used until Phase 2, but fine to create now) |
 

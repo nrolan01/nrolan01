@@ -6,6 +6,7 @@ const FIELDS = {
   SYMPTOMS: 'Symptoms',         // Multiple select
   ACTIVITY: 'Activity',         // Single line text
   HEART_RATE: 'Heart Rate (bpm)', // Number
+  SPO2: 'SpO2 (%)',             // Number — pulse ox reading
   NOTES: 'Notes',               // Long text
   EKG: 'EKG PDF',                // Attachment (used starting Phase 2)
 };
