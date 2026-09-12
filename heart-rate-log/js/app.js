@@ -203,6 +203,8 @@ function renderEntryView() {
 
   wrap.appendChild(card);
 
+  wrap.appendChild(renderAttachmentsSection(editing));
+
   const errBox = el(`<div class="error-box" hidden></div>`);
   wrap.appendChild(errBox);
 
@@ -310,6 +312,89 @@ function renderEntryView() {
   });
 
   return wrap;
+}
+
+function formatFileSize(bytes) {
+  if (bytes == null) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function renderAttachmentsSection(editing) {
+  const card = el(`<div class="card"></div>`);
+  card.appendChild(el(`<span class="label-text">Photos &amp; Files</span>`));
+
+  if (!editing) {
+    card.appendChild(el(`<p class="hint">Save this entry first — then you can attach photos or files to it (like an EKG PDF export).</p>`));
+    return card;
+  }
+
+  const list = el(`<div class="attachment-list"></div>`);
+  card.appendChild(list);
+
+  function renderList(attachments) {
+    list.replaceChildren();
+    (attachments || []).forEach((att) => {
+      const isImage = (att.type || '').startsWith('image/');
+      const thumbUrl = att.thumbnails?.small?.url;
+      const row = el(`
+        <div class="attachment-row">
+          ${isImage && thumbUrl
+            ? `<img class="attachment-thumb" src="${thumbUrl}" alt="" />`
+            : `<span class="attachment-thumb attachment-thumb-file">📄</span>`}
+          <a class="attachment-info" href="${escapeHtml(att.url)}" target="_blank" rel="noopener">
+            <span class="attachment-name">${escapeHtml(att.filename)}</span>
+            <span class="attachment-size">${formatFileSize(att.size)}</span>
+          </a>
+          <button type="button" class="attachment-remove" aria-label="Remove">✕</button>
+        </div>
+      `);
+      row.querySelector('.attachment-remove').addEventListener('click', async () => {
+        if (!confirm(`Remove "${att.filename}"?`)) return;
+        try {
+          const keep = (attachments || []).filter((a) => a.id !== att.id);
+          const result = await removeAttachment(editing.id, FIELDS.ATTACHMENTS, keep);
+          editing.fields[FIELDS.ATTACHMENTS] = result.fields[FIELDS.ATTACHMENTS] || [];
+          renderList(editing.fields[FIELDS.ATTACHMENTS]);
+          showToast('Removed');
+        } catch (e) {
+          showToast(e.message, true);
+        }
+      });
+      list.appendChild(row);
+    });
+  }
+  renderList(editing.fields[FIELDS.ATTACHMENTS]);
+
+  const fileInput = el(`<input type="file" multiple hidden />`);
+  const addBtn = el(`<button type="button" class="secondary">Add Photo or File</button>`);
+  addBtn.style.marginTop = '4px';
+  addBtn.addEventListener('click', () => fileInput.click());
+
+  fileInput.addEventListener('change', async () => {
+    const files = Array.from(fileInput.files || []);
+    if (files.length === 0) return;
+    addBtn.disabled = true;
+    for (const file of files) {
+      addBtn.textContent = `Uploading ${file.name}…`;
+      try {
+        const result = await uploadAttachment(editing.id, FIELDS.ATTACHMENTS, file);
+        editing.fields[FIELDS.ATTACHMENTS] = result.fields[FIELDS.ATTACHMENTS] || [];
+        renderList(editing.fields[FIELDS.ATTACHMENTS]);
+      } catch (e) {
+        showToast(e.message, true);
+      }
+    }
+    addBtn.disabled = false;
+    addBtn.textContent = 'Add Photo or File';
+    fileInput.value = '';
+  });
+
+  card.appendChild(fileInput);
+  card.appendChild(addBtn);
+
+  return card;
 }
 
 // ---------- History view ----------

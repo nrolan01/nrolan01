@@ -8,7 +8,7 @@ const FIELDS = {
   HEART_RATE: 'Heart Rate (bpm)', // Number
   SPO2: 'SpO2 (%)',             // Number — pulse ox reading
   NOTES: 'Notes',               // Long text
-  EKG: 'EKG PDF',                // Attachment (used starting Phase 2)
+  ATTACHMENTS: 'Attachments',    // Attachment — photos, screenshots, PDFs (e.g. an EKG export)
 };
 
 // Must match the "Symptoms" multiple-select choices in the Airtable Episodes table exactly.

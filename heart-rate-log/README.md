@@ -4,9 +4,9 @@ A small installable web app for logging elevated-heart-rate episodes — date/ti
 intensity, symptoms (lightheadedness, skipped beats, etc.), activity/context, heart rate,
 and notes. Data is stored in your own Airtable base.
 
-This is **Phase 1** of the plan: manual logging with a browsable/editable history grid.
-EKG PDF attachments (Phase 2), intensity/duration/frequency charts (Phase 3), and pulling
-real heart-rate readings from Fitbit (Phase 4) come next.
+This is **Phase 1 + 2** of the plan: manual logging with a browsable/editable history grid,
+plus photo/file attachments (Phase 2). Intensity/duration/frequency charts (Phase 3) and
+pulling real heart-rate readings from Fitbit (Phase 4) come next.
 
 ## How this all fits together (ELI5)
 

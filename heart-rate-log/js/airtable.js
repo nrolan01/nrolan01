@@ -92,3 +92,55 @@ async function testConnection() {
   await airtableRequest('?pageSize=1');
   return true;
 }
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]); // strip "data:...;base64," prefix
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Uploads one file's raw bytes straight to Airtable — a different host/endpoint
+// (content.airtable.com) than the rest of this file, made specifically for apps
+// with no server of their own to host the file at a URL first.
+async function uploadAttachment(recordId, fieldName, file) {
+  const { token, baseId } = getConfig();
+  if (!token) throw new Error('Not configured yet — open Settings first.');
+
+  const base64 = await fileToBase64(file);
+  const url = `https://content.airtable.com/v0/${encodeURIComponent(baseId)}/${encodeURIComponent(recordId)}/${encodeURIComponent(fieldName)}/uploadAttachment`;
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contentType: file.type || 'application/octet-stream',
+      file: base64,
+      filename: file.name || 'upload',
+    }),
+  });
+
+  if (!res.ok) {
+    let detail = '';
+    try {
+      const body = await res.json();
+      detail = body?.error?.message || JSON.stringify(body);
+    } catch {
+      detail = res.statusText;
+    }
+    throw new Error(`Upload failed (${res.status}): ${detail}`);
+  }
+
+  return res.json(); // { id, createdTime, fields: { [fieldName]: [...attachments] } }
+}
+
+// Removes one attachment by re-saving the field with everything except it —
+// referencing an existing attachment by {id} alone keeps it; leaving one out drops it.
+function removeAttachment(recordId, fieldName, keepAttachments) {
+  return updateRecord(recordId, { [fieldName]: keepAttachments.map((a) => ({ id: a.id })) });
+}
