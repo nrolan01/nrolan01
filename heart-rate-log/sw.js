@@ -1,4 +1,4 @@
-const CACHE = 'hr-log-v1';
+const CACHE = 'hr-log-v2';
 const SHELL = [
   './',
   './index.html',
@@ -32,16 +32,17 @@ self.addEventListener('fetch', (event) => {
   // Never cache Airtable API calls — always go to network.
   if (url.hostname.includes('airtable.com')) return;
 
+  // Network-first: while iterating on this app, "online" should always mean
+  // "latest deployed version." The cache exists only as an offline fallback,
+  // not as the default source — a stale-cache-first strategy here was making
+  // every deploy require a full app relaunch before it became visible.
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-      return fetch(event.request).then((res) => {
-        if (event.request.method === 'GET' && res.ok) {
-          const clone = res.clone();
-          caches.open(CACHE).then((cache) => cache.put(event.request, clone));
-        }
-        return res;
-      }).catch(() => cached);
-    })
+    fetch(event.request).then((res) => {
+      if (event.request.method === 'GET' && res.ok) {
+        const clone = res.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, clone));
+      }
+      return res;
+    }).catch(() => caches.match(event.request))
   );
 });
