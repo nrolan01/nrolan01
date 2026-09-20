@@ -305,6 +305,43 @@ table.grid tr.row { cursor: pointer; }
 
 .spinner-line { color: var(--text-dim); text-align: center; padding: 20px; }
 
+/* Chart */
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.chart-legend-label { margin-right: auto; }
+.chart-gradient {
+  width: 90px;
+  height: 8px;
+  border-radius: 4px;
+}
+.chart-tooltip {
+  position: absolute;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  pointer-events: none;
+  max-width: 160px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+.chart-tooltip-date { color: var(--text); font-weight: 600; }
+.chart-tooltip-value { color: var(--text); }
+.chart-tooltip-symptoms { color: var(--text-dim); margin-top: 4px; }
+
 /* Attachments */
 .attachment-list { margin-bottom: 10px; }
 .attachment-row {

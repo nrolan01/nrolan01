@@ -77,6 +77,10 @@ function render() {
     pageTitle.textContent = 'History';
     view.replaceChildren(renderHistoryLoading());
     loadHistory();
+  } else if (state.tab === 'chart') {
+    pageTitle.textContent = 'Chart';
+    view.replaceChildren(renderChartLoading());
+    loadChart();
   } else {
     pageTitle.textContent = 'Settings';
     view.replaceChildren(renderSettingsView());
@@ -231,43 +235,61 @@ function renderEntryView() {
     wrap.appendChild(delBtn);
   }
 
-  // date/time display sync — the native input drives the value, this div is
-  // purely what's shown, so its width/layout is fully ours to control
+  // date/time state — kept as our own variable rather than trusting a
+  // read-back from the (invisible, overlaid) native input every time.
+  // Chip taps write into the native input too (so it's anchored correctly
+  // if the user opens the picker directly afterward), but the display and
+  // the save payload never depend on reading that write back — iOS Safari
+  // has been unreliable about reflecting script-set values on an overlaid
+  // datetime-local input, which is what made the Today/Yesterday chips
+  // appear to do nothing.
   const occurredAtInput = wrap.querySelector('#occurredAt');
   const occurredAtDisplay = wrap.querySelector('#occurredAtDisplay');
+  let occurredAtValue = initialDateVal;
+
   function refreshDateDisplay() {
-    occurredAtDisplay.textContent = occurredAtInput.value
-      ? friendlyDateTime(localInputValueToIso(occurredAtInput.value))
+    occurredAtDisplay.textContent = occurredAtValue
+      ? friendlyDateTime(localInputValueToIso(occurredAtValue))
       : 'Select date & time';
   }
-  occurredAtInput.addEventListener('input', refreshDateDisplay);
-  occurredAtInput.addEventListener('change', refreshDateDisplay);
+  function setOccurredAt(value) {
+    occurredAtValue = value;
+    occurredAtInput.value = value;
+    refreshDateDisplay();
+  }
+  // Only real user interaction with the native picker fires these — a
+  // programmatic .value set (as chips do) never does, so this can't loop.
+  occurredAtInput.addEventListener('input', () => { occurredAtValue = occurredAtInput.value; refreshDateDisplay(); });
+  occurredAtInput.addEventListener('change', () => { occurredAtValue = occurredAtInput.value; refreshDateDisplay(); });
   refreshDateDisplay();
 
   // chip behavior
   wrap.querySelectorAll('[data-chip]').forEach((chip) => {
     chip.addEventListener('click', () => {
-      const input = occurredAtInput;
-      const current = input.value ? new Date(input.value) : new Date();
+      const current = occurredAtValue ? new Date(occurredAtValue) : new Date();
       const now = new Date();
       if (chip.dataset.chip === 'now') {
-        input.value = toLocalInputValue(now);
+        setOccurredAt(toLocalInputValue(now));
       } else if (chip.dataset.chip === 'today') {
         current.setFullYear(now.getFullYear(), now.getMonth(), now.getDate());
-        input.value = toLocalInputValue(current);
+        setOccurredAt(toLocalInputValue(current));
       } else if (chip.dataset.chip === 'yesterday') {
         const y = new Date(now);
         y.setDate(now.getDate() - 1);
         current.setFullYear(y.getFullYear(), y.getMonth(), y.getDate());
-        input.value = toLocalInputValue(current);
+        setOccurredAt(toLocalInputValue(current));
       }
-      refreshDateDisplay();
+      // Visible confirmation on every tap, even when the resulting value
+      // doesn't change (e.g. tapping "Today" when it's already today) —
+      // otherwise a no-op-looking tap reads as a broken button.
+      chip.classList.add('active');
+      setTimeout(() => chip.classList.remove('active'), 200);
     });
   });
 
   saveBtn.addEventListener('click', async () => {
     errBox.hidden = true;
-    const occurredAtVal = wrap.querySelector('#occurredAt').value;
+    const occurredAtVal = occurredAtValue;
     if (!occurredAtVal) {
       errBox.textContent = 'Please set a date/time.';
       errBox.hidden = false;

@@ -1,4 +1,4 @@
-const CACHE = 'hr-log-v2';
+const CACHE = 'hr-log-v3';
 const SHELL = [
   './',
   './index.html',
@@ -7,6 +7,7 @@ const SHELL = [
   './js/airtable.js',
   './js/schema.js',
   './js/themes.js',
+  './js/chart.js',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
